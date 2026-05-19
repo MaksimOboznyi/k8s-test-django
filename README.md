@@ -1,77 +1,551 @@
-# Django Site
+# K8s Test Django
 
-Докеризированный сайт на Django для экспериментов с Kubernetes.
+Учебный проект для запуска Django-сайта в Kubernetes через Minikube.
 
-Внутри контейнера Django приложение запускается с помощью Nginx Unit, не путать с Nginx. Сервер Nginx Unit выполняет сразу две функции: как веб-сервер он раздаёт файлы статики и медиа, а в роли сервера-приложений он запускает Python и Django. Таким образом Nginx Unit заменяет собой связку из двух сервисов Nginx и Gunicorn/uWSGI. [Подробнее про Nginx Unit](https://unit.nginx.org/).
+В проекте используются:
 
-## Как подготовить окружение к локальной разработке
+- Docker Compose для запуска базы данных PostgreSQL
+- Minikube для локального Kubernetes-кластера
+- Kubernetes Deployment для запуска Django
+- Kubernetes Service для доступа к сайту
+- Kubernetes Secret для хранения секретных настроек
 
-Код в репозитории полностью докеризирован, поэтому для запуска приложения вам понадобится Docker. Инструкции по его установке ищите на официальных сайтах:
+---
 
-- [Get Started with Docker](https://www.docker.com/get-started/)
+## Запуск базы данных
 
-Вместе со свежей версией Docker к вам на компьютер автоматически будет установлен Docker Compose. Дальнейшие инструкции будут его активно использовать.
+База данных запускается снаружи Kubernetes-кластера через Docker Compose.
 
-## Как запустить сайт для локальной разработки
+Создайте файл:
 
-Запустите базу данных и сайт:
-
-```shell
-$ docker compose up
+```text
+docker-compose.override.yml
 ```
 
-В новом терминале, не выключая сайт, запустите несколько команд:
+Содержимое файла:
 
-```shell
-$ docker compose run --rm web ./manage.py migrate  # создаём/обновляем таблицы в БД
-$ docker compose run --rm web ./manage.py createsuperuser  # создаём в БД учётку суперпользователя
+```yaml
+services:
+  db:
+    ports:
+      - "5432:5432"
 ```
 
-Готово. Сайт будет доступен по адресу [http://127.0.0.1:8080](http://127.0.0.1:8080). Вход в админку находится по адресу [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/).
+Запустите базу данных:
 
-## Как вести разработку
-
-Все файлы с кодом django смонтированы внутрь докер-контейнера, чтобы Nginx Unit сразу видел изменения в коде и не требовал постоянно пересборки докер-образа -- достаточно перезапустить сервисы Docker Compose.
-
-### Как обновить приложение из основного репозитория
-
-Чтобы обновить приложение до последней версии подтяните код из центрального окружения и пересоберите докер-образы:
-
-``` shell
-$ git pull
-$ docker compose build
+```bash
+docker compose up -d db
 ```
 
-После обновлении кода из репозитория стоит также обновить и схему БД. Вместе с коммитом могли прилететь новые миграции схемы БД, и без них код не запустится.
+Проверьте, что база работает:
 
-Чтобы не гадать заведётся код или нет — запускайте при каждом обновлении команду `migrate`. Если найдутся свежие миграции, то команда их применит:
-
-```shell
-$ docker compose run --rm web ./manage.py migrate
-…
-Running migrations:
-  No migrations to apply.
+```bash
+docker compose ps
 ```
 
-### Как добавить библиотеку в зависимости
+В колонке `PORTS` должно быть:
 
-В качестве менеджера пакетов для образа с Django используется pip с файлом requirements.txt. Для установки новой библиотеки достаточно прописать её в файл requirements.txt и запустить сборку докер-образа:
-
-```sh
-$ docker compose build web
+```text
+0.0.0.0:5432->5432/tcp
 ```
 
-Аналогичным образом можно удалять библиотеки из зависимостей.
+---
 
-<a name="env-variables"></a>
-## Переменные окружения
+## Запуск Minikube
 
-Образ с Django считывает настройки из переменных окружения:
+Запустите Minikube с подходящим драйвером.
 
-`SECRET_KEY` -- обязательная секретная настройка Django. Это соль для генерации хэшей. Значение может быть любым, важно лишь, чтобы оно никому не было известно. [Документация Django](https://docs.djangoproject.com/en/3.2/ref/settings/#secret-key).
+Если используется Docker:
 
-`DEBUG` -- настройка Django для включения отладочного режима. Принимает значения `TRUE` или `FALSE`. [Документация Django](https://docs.djangoproject.com/en/3.2/ref/settings/#std:setting-DEBUG).
+```bash
+minikube start --driver=docker
+```
 
-`ALLOWED_HOSTS` -- настройка Django со списком разрешённых адресов. Если запрос прилетит на другой адрес, то сайт ответит ошибкой 400. Можно перечислить несколько адресов через запятую, например `127.0.0.1,192.168.0.1,site.test`. [Документация Django](https://docs.djangoproject.com/en/3.2/ref/settings/#allowed-hosts).
+Если используется VirtualBox:
 
-`DATABASE_URL` -- адрес для подключения к базе данных PostgreSQL. Другие СУБД сайт не поддерживает. [Формат записи](https://github.com/jacobian/dj-database-url#url-schema).
+```bash
+minikube start --driver=virtualbox
+```
+
+Проверьте кластер:
+
+```bash
+kubectl get nodes
+```
+
+Ожидаемый результат:
+
+```text
+NAME       STATUS   ROLES           AGE   VERSION
+minikube   Ready    control-plane   ...
+```
+
+---
+
+## Сборка Docker-образа Django
+
+Собирать образ нужно из корня проекта:
+
+```bash
+minikube image build -t django_app:latest backend_main_django
+```
+
+Проверьте, что образ появился в Minikube:
+
+```bash
+minikube image ls
+```
+
+В списке должен быть образ:
+
+```text
+docker.io/library/django_app:latest
+```
+
+---
+
+## Kubernetes Secret
+
+Для запуска Django в Kubernetes нужно создать объект `Secret`.
+
+Создайте файл:
+
+```text
+kubernetes/django-secret.yaml
+```
+
+Пример содержимого:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: django-secret
+type: Opaque
+stringData:
+  SECRET_KEY: your-secret-key
+  DATABASE_URL: postgres://user:password@host:5432/database
+```
+
+Для локального запуска с базой данных из Docker Compose значение `DATABASE_URL` может выглядеть так:
+
+```text
+postgres://test_k8s:OwOtBep9Frut@host.minikube.internal:5432/test_k8s
+```
+
+Примените Secret в кластере:
+
+```bash
+kubectl apply -f kubernetes/django-secret.yaml
+```
+
+Проверьте, что Secret появился:
+
+```bash
+kubectl get secrets
+```
+
+В списке должен быть объект:
+
+```text
+django-secret
+```
+
+Файл `kubernetes/django-secret.yaml` содержит секретные данные, поэтому его нельзя коммитить.
+
+Добавьте его в `.gitignore`:
+
+```gitignore
+kubernetes/django-secret.yaml
+```
+
+---
+
+## Deployment
+
+Файл:
+
+```text
+kubernetes/django-deployment.yaml
+```
+
+Содержимое:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django
+  template:
+    metadata:
+      labels:
+        app: django
+    spec:
+      containers:
+        - name: django
+          image: django_app:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: django-secret
+                  key: SECRET_KEY
+
+            - name: DEBUG
+              value: "False"
+
+            - name: ALLOWED_HOSTS
+              value: "*"
+
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: django-secret
+                  key: DATABASE_URL
+```
+
+Примените Deployment:
+
+```bash
+kubectl apply -f kubernetes/django-deployment.yaml
+```
+
+Проверьте Deployment:
+
+```bash
+kubectl get deployments
+```
+
+Ожидаемый результат:
+
+```text
+NAME     READY   UP-TO-DATE   AVAILABLE   AGE
+django   1/1     1            1           ...
+```
+
+Проверьте Pod:
+
+```bash
+kubectl get pods
+```
+
+Ожидаемый результат:
+
+```text
+django-xxxxxxxxxx-xxxxx   1/1   Running   0   ...
+```
+
+---
+
+## Service
+
+Файл:
+
+```text
+kubernetes/django-service.yaml
+```
+
+Содержимое:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: django
+spec:
+  type: NodePort
+  selector:
+    app: django
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+```
+
+Примените Service:
+
+```bash
+kubectl apply -f kubernetes/django-service.yaml
+```
+
+Проверьте Service:
+
+```bash
+kubectl get svc
+```
+
+Ожидаемый результат:
+
+```text
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+django       NodePort    ...             <none>        80:xxxxx/TCP   ...
+kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP        ...
+```
+
+---
+
+## Запуск сайта
+
+Полный порядок запуска:
+
+```bash
+docker compose up -d db
+minikube image build -t django_app:latest backend_main_django
+kubectl apply -f kubernetes/django-secret.yaml
+kubectl apply -f kubernetes/django-deployment.yaml
+kubectl apply -f kubernetes/django-service.yaml
+```
+
+Проверьте состояние объектов:
+
+```bash
+kubectl get secrets
+kubectl get deployments
+kubectl get pods
+kubectl get svc
+```
+
+Получите адрес сайта:
+
+```bash
+minikube service django --url
+```
+
+Откройте сайт в браузере:
+
+```text
+http://127.0.0.1:PORT
+```
+
+Админка Django:
+
+```text
+http://127.0.0.1:PORT/admin/
+```
+
+Если команда `minikube service django --url` открыла временный доступ через терминал, оставьте этот терминал открытым во время проверки сайта.
+
+---
+
+## Проверка Django shell
+
+Получите имя Pod:
+
+```bash
+kubectl get pods
+```
+
+Зайдите в Django shell:
+
+```bash
+kubectl exec -it POD_NAME -- ./manage.py shell
+```
+
+Проверьте подключение к базе данных:
+
+```python
+from django.contrib.auth.models import User
+User.objects.all()
+```
+
+Выйти из shell:
+
+```python
+exit()
+```
+
+---
+
+## Полезные команды
+
+Посмотреть Pod'ы:
+
+```bash
+kubectl get pods
+```
+
+Посмотреть сервисы:
+
+```bash
+kubectl get svc
+```
+
+Посмотреть Deployment'ы:
+
+```bash
+kubectl get deployments
+```
+
+Посмотреть Secret'ы:
+
+```bash
+kubectl get secrets
+```
+
+Посмотреть логи Django:
+
+```bash
+kubectl logs deployment/django
+```
+
+Проверить обновление Deployment:
+
+```bash
+kubectl rollout status deployment/django
+```
+
+Удалить Deployment:
+
+```bash
+kubectl delete deployment django
+```
+
+Удалить Service:
+
+```bash
+kubectl delete service django
+```
+
+---
+
+## Возможные проблемы
+
+### База данных не запущена
+
+Проверьте:
+
+```bash
+docker compose ps
+```
+
+Если база не запущена:
+
+```bash
+docker compose up -d db
+```
+
+---
+
+### Docker daemon недоступен
+
+Если появляется ошибка:
+
+```text
+Cannot connect to the Docker daemon
+```
+
+Запустите Docker Desktop и проверьте:
+
+```bash
+docker ps
+```
+
+---
+
+### kubectl не подключается к кластеру
+
+Если появляется ошибка:
+
+```text
+The connection to the server 127.0.0.1 was refused
+```
+
+Проверьте Minikube:
+
+```bash
+minikube status
+```
+
+Запустите Minikube заново:
+
+```bash
+minikube start --driver=docker
+```
+
+или:
+
+```bash
+minikube start --driver=virtualbox
+```
+
+---
+
+### Server Error 500
+
+Проверьте логи Django:
+
+```bash
+kubectl logs deployment/django
+```
+
+Проверьте базу данных:
+
+```bash
+docker compose ps
+```
+
+Если база не запущена:
+
+```bash
+docker compose up -d db
+```
+
+---
+
+### Bad Request 400
+
+Проблема может быть в `ALLOWED_HOSTS`.
+
+Для учебного локального запуска можно использовать:
+
+```yaml
+- name: ALLOWED_HOSTS
+  value: "*"
+```
+
+В настоящем production так делать нельзя.
+
+---
+
+## Git
+
+Перед коммитом проверьте статус:
+
+```bash
+git status
+```
+
+В коммит должны попасть:
+
+```text
+README.md
+.gitignore
+kubernetes/django-deployment.yaml
+kubernetes/django-service.yaml
+```
+
+В коммит не должен попасть:
+
+```text
+kubernetes/django-secret.yaml
+```
+
+Добавьте файлы:
+
+```bash
+git add README.md .gitignore kubernetes/django-deployment.yaml kubernetes/django-service.yaml
+```
+
+Создайте коммит:
+
+```bash
+git commit -m "add k8s manifest files"
+```

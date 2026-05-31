@@ -261,7 +261,7 @@ kind: Service
 metadata:
   name: django
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: django
   ports:
@@ -279,15 +279,98 @@ kubectl apply -f kubernetes/django-service.yaml
 Проверьте Service:
 
 ```bash
-kubectl get svc
+kubectl get service
 ```
 
 Ожидаемый результат:
 
 ```text
-NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
-django       NodePort    ...             <none>        80:xxxxx/TCP   ...
-kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP        ...
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+django       ClusterIP   ...             <none>        80/TCP    ...
+kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP   ...
+
+---
+
+## Ingress
+
+Для доступа к сайту по домену используется Kubernetes Ingress.
+
+Включите Ingress в Minikube:
+
+```bash
+minikube addons enable ingress
+```
+
+Проверьте, что Ingress Controller запущен:
+
+```bash
+kubectl get pods -n ingress-nginx
+```
+
+Файл:
+
+```text
+kubernetes/django-ingress.yaml
+```
+
+Содержимое:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: django
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: star-burger.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: django
+                port:
+                  number: 80
+```
+
+Примените Ingress:
+
+```bash
+kubectl apply -f kubernetes/django-ingress.yaml
+```
+
+Проверьте Ingress:
+
+```bash
+kubectl get ingress
+```
+
+Добавьте домен в `/etc/hosts`:
+
+```text
+127.0.0.1 star-burger.test
+```
+
+Если используется Minikube с Docker-драйвером, запустите туннель:
+
+```bash
+minikube tunnel
+```
+
+Терминал с `minikube tunnel` нужно оставить открытым.
+
+После этого сайт будет доступен по адресу:
+
+```text
+http://star-burger.test
+```
+
+Админка Django:
+
+```text
+http://star-burger.test/admin/
 ```
 
 ---
@@ -302,6 +385,7 @@ minikube image build -t django_app:latest backend_main_django
 kubectl apply -f kubernetes/django-secret.yaml
 kubectl apply -f kubernetes/django-deployment.yaml
 kubectl apply -f kubernetes/django-service.yaml
+kubectl apply -f kubernetes/django-ingress.yaml
 ```
 
 Проверьте состояние объектов:
@@ -310,28 +394,21 @@ kubectl apply -f kubernetes/django-service.yaml
 kubectl get secrets
 kubectl get deployments
 kubectl get pods
-kubectl get svc
+kubectl get service
+kubectl get ingress
 ```
 
-Получите адрес сайта:
-
-```bash
-minikube service django --url
-```
-
-Откройте сайт в браузере:
+Сайт доступен по адресу:
 
 ```text
-http://127.0.0.1:PORT
+http://star-burger.test
 ```
 
 Админка Django:
 
 ```text
-http://127.0.0.1:PORT/admin/
+http://star-burger.test/admin/
 ```
-
-Если команда `minikube service django --url` открыла временный доступ через терминал, оставьте этот терминал открытым во время проверки сайта.
 
 ---
 
@@ -526,10 +603,10 @@ git status
 В коммит должны попасть:
 
 ```text
-README.md
 .gitignore
 kubernetes/django-deployment.yaml
 kubernetes/django-service.yaml
+kubernetes/django-ingress.yaml
 ```
 
 В коммит не должен попасть:
@@ -541,7 +618,7 @@ kubernetes/django-secret.yaml
 Добавьте файлы:
 
 ```bash
-git add README.md .gitignore kubernetes/django-deployment.yaml kubernetes/django-service.yaml
+git add README.md .gitignore kubernetes/django-deployment.yaml kubernetes/django-service.yaml kubernetes/django-ingress.yaml
 ```
 
 Создайте коммит:

@@ -237,7 +237,7 @@ django   1/1     1            1           ...
 kubectl get pods
 ```
 
-Ожидаемый результат:
+Ожидаемый результат: 
 
 ```text
 django-xxxxxxxxxx-xxxxx   1/1   Running   0   ...
@@ -421,6 +421,42 @@ kubectl get jobs
 django-clearsessions-once   1/1
 ```
 
+---
+
+## Database migrations
+
+Для запуска миграций Django используется Kubernetes Job.
+
+Файл:
+
+```text
+kubernetes/django-migrate-job.yaml
+```
+
+Job запускает команду:
+
+```bash
+./manage.py migrate --noinput
+```
+
+Применить Job:
+
+```bash
+kubectl apply -f kubernetes/django-migrate-job.yaml
+```
+
+Проверить Job:
+
+```bash
+kubectl get jobs
+```
+
+Посмотреть логи:
+
+```bash
+kubectl get pods
+kubectl logs POD_NAME
+```
 
 ---
 

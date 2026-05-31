@@ -375,6 +375,55 @@ http://star-burger.test/admin/
 
 ---
 
+## Regular session cleanup
+
+Для регулярного удаления устаревших Django-сессий используется Kubernetes CronJob.
+
+Файл:
+
+```text
+kubernetes/django-clearsessions-cronjob.yaml
+```
+
+CronJob запускает команду:
+
+```bash
+./manage.py clearsessions
+```
+
+Применить CronJob:
+
+```bash
+kubectl apply -f kubernetes/django-clearsessions-cronjob.yaml
+```
+
+Проверить CronJob:
+
+```bash
+kubectl get cronjobs
+```
+
+Чтобы вручную проверить работу CronJob, можно создать Job:
+
+```bash
+kubectl create job django-clearsessions-once --from=cronjob/django-clearsessions
+```
+
+Проверить Job:
+
+```bash
+kubectl get jobs
+```
+
+Ожидаемый результат:
+
+```text
+django-clearsessions-once   1/1
+```
+
+
+---
+
 ## Запуск сайта
 
 Полный порядок запуска:

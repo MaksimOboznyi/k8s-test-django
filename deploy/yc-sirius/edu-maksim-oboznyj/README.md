@@ -36,3 +36,29 @@ kubectl apply -f deploy/yc-sirius/edu-maksim-oboznyj/psql-test-pod.yaml
 ```bash
 kubectl exec -it psql-test -n edu-maksim-oboznyj -- ls -l /root/.postgresql
 ```
+
+# Сборка и публикация Docker-образа
+
+Получить хэш текущего коммита:
+
+```bash
+git rev-parse --short HEAD
+```
+
+Собрать Docker-образ:
+
+```bash
+docker build -t maksimoboznyi/k8s-test-django:<git-hash> ./backend_main_django
+```
+
+Загрузить образ в Docker Hub:
+
+```bash
+docker push maksimoboznyi/k8s-test-django:<git-hash>
+```
+
+Скачать образ из Docker Hub:
+
+```bash
+docker pull maksimoboznyi/k8s-test-django:<git-hash>
+```

@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: django
-          image: django_app:latest
-          imagePullPolicy: Never
+          image: maksimoboznyi/k8s-test-django:dd71361
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           env:
@@ -34,5 +34,5 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: django-secret
-                  key: DATABASE_URL
+                  name: postgres
+                  key: dsn

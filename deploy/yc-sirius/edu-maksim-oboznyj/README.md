@@ -65,6 +65,7 @@ docker pull maksimoboznyi/k8s-test-django:<git-hash>
 
 # Деплой Django в Kubernetes
 
+
 ## Обновить Deployment
 
 После публикации нового Docker-образа измените тег образа в:
@@ -105,3 +106,20 @@ kubectl exec -it deployment/django \
   -n edu-maksim-oboznyj \
   -- python manage.py createsuperuser
 ```
+
+# Требования для работы проекта
+
+- Kubernetes Cluster
+- PostgreSQL
+- Secret postgres
+- Secret django-secret
+- Docker Hub
+
+# Переменные окружения
+
+| Переменная | Назначение |
+|------------|------------|
+| SECRET_KEY | Django secret key |
+| DATABASE_URL | Строка подключения к PostgreSQL |
+| DEBUG | Режим отладки |
+| ALLOWED_HOSTS | Список разрешённых хостов |

@@ -62,3 +62,46 @@ docker push maksimoboznyi/k8s-test-django:<git-hash>
 ```bash
 docker pull maksimoboznyi/k8s-test-django:<git-hash>
 ```
+
+# Деплой Django в Kubernetes
+
+## Обновить Deployment
+
+После публикации нового Docker-образа измените тег образа в:
+
+kubernetes/django-deployment.yaml
+
+Примените изменения:
+
+```bash
+kubectl apply -f kubernetes/django-deployment.yaml -n edu-maksim-oboznyj
+kubectl apply -f kubernetes/django-service.yaml -n edu-maksim-oboznyj
+```
+
+## Проверить статус Pod
+
+```bash
+kubectl get pods -n edu-maksim-oboznyj
+```
+
+## Просмотр логов
+
+```bash
+kubectl logs deployment/django -n edu-maksim-oboznyj
+```
+
+## Выполнение миграций
+
+```bash
+kubectl exec -it deployment/django \
+  -n edu-maksim-oboznyj \
+  -- python manage.py migrate
+```
+
+## Создание суперпользователя
+
+```bash
+kubectl exec -it deployment/django \
+  -n edu-maksim-oboznyj \
+  -- python manage.py createsuperuser
+```
